@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace StatusHttpServer
@@ -8,6 +9,7 @@ namespace StatusHttpServer
     {
         private readonly Action<HttpListenerContext> _httpHandler;
         private HttpListener _listener;
+        private CancellationTokenSource _cts;
 
         public TinyHttpServer(string urlPrefix, Action<HttpListenerContext> httpHandler)
         {
@@ -26,17 +28,24 @@ namespace StatusHttpServer
         public void Start()
         {
             _listener.Start();
+            _cts = new CancellationTokenSource();
             Task.Run(async () =>
             {
                 using (_listener)
                 {
-                    while (true)
+                    while (!_cts.Token.IsCancellationRequested)
                     {
                         HttpListenerContext context = await _listener.GetContextAsync();
                         _httpHandler.Invoke(context);
                     }
                 }
-            });
+            }, _cts.Token);
+        }
+
+        public void Stop()
+        {
+            _cts.Cancel();
+
         }
     }
 }
